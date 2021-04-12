@@ -27,9 +27,9 @@ players$dateOfBirth = as.Date.character(players$dateOfBirth, format = "%m/%d/%Y"
 players$dateOfBirth = yday(players$dateOfBirth)
 players$wb = ceiling(players$dateOfBirth / 7)
 ##for now, ignoring players in week 53
-players = players %>% filter(players$wb < 53)
+#players = players %>% filter(players$wb < 53)
 # change so that wk 53 is included in wk 52
-#players$wb[players$wb==53] <- 52
+players$wb[players$wb==53] <- 52
 players$tb = (players$wb - 0.5)/52
 ```
 
@@ -40,6 +40,10 @@ I haven't adjusted my data yet to correct for the 53rd birthweek like they did i
 Recreating the t-test of mean section of Table 1
 
 ```{r}
+# get weighted mean for all players. this was just me checking if it matched.
+#weights <- if_else(players$wb==52, 7/8.25, 1)
+#weighted.mean(players$tb, weights)
+
 countrylist = c("Argentina", "Netherlands", "Turkey", "Belgium", 
                 "Spain", "Italy", "Germany", "Portugal", "Brazil", 
                 "Russia", "France")
@@ -49,7 +53,8 @@ grouped_data = players %>%
          country == "Belgium"  | country == "Spain" | country ==  "Italy" |  country == "Germany"  |
          country == "Portugal" | country == "Brazil" | country == "Russia" | country == "France") %>%
   summarize(n = n(),
-            xbar = mean(tb),
+            #xbar = mean(tb),
+            xbar = weighted.mean(tb, if_else(wb==52, 7/8.25, 1)),
             s =  sd(tb))
 grouped_data$t = (grouped_data$xbar - 0.5) / (grouped_data$s / sqrt(grouped_data$n))
 grouped_data$p = pt(grouped_data$t,  df  =  grouped_data$n)
@@ -69,7 +74,7 @@ regression_data = players %>%
   summarize(n = n()) %>%
   mutate(tb = (wb-0.5)/52)
 #Deflate frequency of wk 52 by 7/8.25. R gives a warning bc that count is no longer an integer.
-#regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
+regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
 regression_data %>% kable()
 #This is the model for all countries
 (pois_model = glm(n~tb, data  = regression_data, family = "poisson"))
@@ -86,7 +91,7 @@ regression_data = players %>%
   summarize(n = n()) %>%
   mutate(tb = (wb-0.5)/52)
 #Deflate frequency of wk 52 by 7/8.25. R gives a warning bc that count is no longer an integer.
-#regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
+regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
 pois_model = glm(n~tb, data = regression_data, family = "poisson")
 summary(pois_model)
 ```
