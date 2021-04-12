@@ -1,0 +1,92 @@
+---
+title: "Stat 3302 Project"
+author: "Molly Hunold"
+date: "4/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Loading Data and Libraries, message = FALSE, error = FALSE}
+library(tidyverse)
+library(lubridate)
+library(kableExtra)
+library(broom)
+players  = read_csv("C:/Users/mehun/Documents/8 - Spring 2021/Stat 3302 Statistical Modeling for Discovery II/Homework/data.csv")
+```
+
+## Data Transformation
+
+The date of birth is currently a character string like "MM/DD/YY", I want to convert this to a single number 1-365 for the players date of birth, regardless of year. 
+
+```{r Convert DOB}
+# changed to %Y instead of %y b/c yr given w/ century. was producing two NA values.
+players$dateOfBirth = as.Date.character(players$dateOfBirth, format = "%m/%d/%Y")
+players$dateOfBirth = yday(players$dateOfBirth)
+players$wb = ceiling(players$dateOfBirth / 7)
+##for now, ignoring players in week 53
+players = players %>% filter(players$wb < 53)
+# change so that wk 53 is included in wk 52
+#players$wb[players$wb==53] <- 52
+players$tb = (players$wb - 0.5)/52
+```
+
+## Table 1
+
+I haven't adjusted my data yet to correct for the 53rd birthweek like they did in the paper, but the t tests loosly match (i'd imagine once the 53rd birthweek is adjusted they'd match exactly). 
+
+Recreating the t-test of mean section of Table 1
+
+```{r}
+countrylist = c("Argentina", "Netherlands", "Turkey", "Belgium", 
+                "Spain", "Italy", "Germany", "Portugal", "Brazil", 
+                "Russia", "France")
+grouped_data = players %>% 
+  group_by(country) %>%
+  filter(country == "Argentina" | country == "Netherlands" | country == "Turkey" |
+         country == "Belgium"  | country == "Spain" | country ==  "Italy" |  country == "Germany"  |
+         country == "Portugal" | country == "Brazil" | country == "Russia" | country == "France") %>%
+  summarize(n = n(),
+            xbar = mean(tb),
+            s =  sd(tb))
+grouped_data$t = (grouped_data$xbar - 0.5) / (grouped_data$s / sqrt(grouped_data$n))
+grouped_data$p = pt(grouped_data$t,  df  =  grouped_data$n)
+grouped_data$p = if_else(grouped_data$p < 0.001, "< .001", if_else(grouped_data$p < 0.01, "< 0.01", if_else(grouped_data$p < 0.05, "< 0.05", " ")))
+grouped_data$tb = round(grouped_data$xbar, 3)
+grouped_data = grouped_data %>% select(country,n,tb,p) %>% arrange(tb)
+grouped_data %>% kable()
+```
+
+Recreating the poisson regression - this all loosely fits for the model for all countries.
+
+```{r}
+#Need the data as Team, Week, N
+players = as_tibble(players)
+regression_data = players %>%
+  group_by(wb) %>%
+  summarize(n = n()) %>%
+  mutate(tb = (wb-0.5)/52)
+#Deflate frequency of wk 52 by 7/8.25. R gives a warning bc that count is no longer an integer.
+#regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
+regression_data %>% kable()
+#This is the model for all countries
+(pois_model = glm(n~tb, data  = regression_data, family = "poisson"))
+(r2 = 1- (pois_model$deviance/pois_model$null.deviance))
+```
+
+But I havent figured out how to match the models for individual countries...
+
+```{r}
+#This is the model for just one country?
+regression_data = players %>%
+  filter(country == "Argentina") %>%
+  group_by(wb) %>%
+  summarize(n = n()) %>%
+  mutate(tb = (wb-0.5)/52)
+#Deflate frequency of wk 52 by 7/8.25. R gives a warning bc that count is no longer an integer.
+#regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
+pois_model = glm(n~tb, data = regression_data, family = "poisson")
+summary(pois_model)
+```
