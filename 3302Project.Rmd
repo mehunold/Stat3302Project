@@ -79,6 +79,42 @@ regression_data %>% kable()
 #This is the model for all countries
 (pois_model = glm(n~tb, data  = regression_data, family = "poisson"))
 (r2 = 1- (pois_model$deviance/pois_model$null.deviance))
+
+#graph1
+ggplot(data=regression_data, aes(x=tb, y=n)) +
+  geom_point() +
+  geom_smooth(method="glm", family="poisson", se=FALSE) +
+  theme_bw() +
+  labs(title="RAE bias in professional football: FREQUENCY ANALYSIS",
+       x="time of birth in year (tB)",
+       y="birth count per week")
+```
+
+```{r}
+# Regression w/ mean log transfer value
+
+# need mean log transfer value and tb
+players = as_tibble(players)
+regression_data = players %>%
+  group_by(wb) %>%
+  summarize(meanlogtv = mean(log(transferValue))) %>%
+  mutate(tb = (wb-0.5)/52)
+regression_data
+#Deflate frequency of wk 52 by 7/8.25. R gives a warning bc that count is no longer an integer.
+regression_data$n[regression_data$wb==52] <- regression_data$n[regression_data$wb==52] * (7/8.25)
+regression_data %>% kable()
+#model
+(pois_model = glm(meanlogtv~tb, data  = regression_data, family = "poisson"))
+(r2 = 1- (pois_model$deviance/pois_model$null.deviance))
+
+#graph2
+ggplot(data=regression_data, aes(x=tb, y=meanlogtv)) +
+  geom_point() +
+  geom_smooth(method="glm", family="poisson", se=FALSE) +
+  theme_bw() +
+  labs(title="RAE bias in professional football: VALUE ANALYSIS",
+       x="time of birth in year (tB)",
+       y="mean log value per week")
 ```
 
 But I havent figured out how to match the models for individual countries...
